@@ -1,0 +1,349 @@
+!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Streak Tracker</title>
+
+<!-- PWA manifest -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#10b981">
+
+<style>
+  :root{
+    --bg:#0f1724;
+    --card:#0b1220;
+    --accent:#10b981;
+    --muted:#94a3b8;
+    --danger:#ef4444;
+    --glass: rgba(255,255,255,0.03);
+    --text:#e6eef8;
+  }
+  html,body{height:100%;margin:0;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;background: linear-gradient(180deg,#071021 0%, #0b1420 100%);color:var(--text);}
+  .wrap{max-width:720px;margin:16px auto;padding:12px;}
+  header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .title{display:flex;gap:8px;align-items:center;}
+  .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#06b6d4);display:flex;align-items:center;justify-content:center;font-weight:700;color:#022;}
+  h1{font-size:18px;margin:0;}
+  .controls{display:flex;gap:8px;align-items:center;}
+  button{background:var(--glass);border:1px solid rgba(255,255,255,0.04);color:var(--text);padding:8px 10px;border-radius:8px;font-weight:600;}
+  .small{padding:6px 8px;font-size:13px}
+  .stats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .stat{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:10px;border-radius:10px;min-width:110px;text-align:center;border:1px solid rgba(255,255,255,0.02);}
+  .stat .num{font-size:18px;font-weight:700;margin-top:6px;}
+  .calendar{background:rgba(255,255,255,0.02);border-radius:12px;padding:10px;border:1px solid rgba(255,255,255,0.03);}
+  .monthHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .weekday{text-align:center;font-size:12px;color:var(--muted);padding:6px 0;}
+  .day{height:56px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:transparent;border:1px dashed rgba(255,255,255,0.02);font-weight:600;user-select:none;}
+  @media (max-width:420px){.day{height:48px;font-size:14px}.stat{min-width:80px;padding:8px}}
+  .day.other{opacity:0.35}
+  .day.done{background:linear-gradient(180deg, rgba(16,185,129,0.18), rgba(6,182,212,0.06));border:1px solid rgba(16,185,129,0.25);box-shadow:0 4px 14px rgba(16,185,129,0.06) inset;color: #eafff5;}
+  .day.today{box-shadow:0 0 0 3px rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);}
+  .day.missed{background:linear-gradient(180deg, rgba(239,68,68,0.08), rgba(239,68,68,0.02));border:1px solid rgba(239,68,68,0.12);}
+  .legend{display:flex;gap:8px;margin-top:10px;align-items:center;font-size:13px;color:var(--muted)}
+  .dot{width:12px;height:12px;border-radius:4px}
+  .dot.done{background:var(--accent)}
+  .dot.missed{background:var(--danger)}
+  .actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .muted{color:var(--muted);font-size:13px}
+  .note{margin-top:8px;color:var(--muted);font-size:13px}
+  input[type=file]{display:none}
+  .footer{margin-top:14px;color:var(--muted);font-size:13px}
+  .dangerBtn{background:linear-gradient(180deg, rgba(239,68,68,0.12), rgba(239,68,68,0.06));border:1px solid rgba(239,68,68,0.12)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="title">
+      <div class="logo">ST</div>
+      <div>
+        <h1>Streak Tracker</h1>
+        <div class="muted" id="habitNameDisplay">Habit: <span id="habitName">No addiction / junk food</span></div>
+      </div>
+    </div>
+    <div class="controls">
+      <button id="prev" class="small">◀</button>
+      <button id="next" class="small">▶</button>
+      <button id="setHabit" class="small">Set habit</button>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="muted">Current streak</div><div class="num" id="currentStreak">0</div></div>
+    <div class="stat"><div class="muted">Longest streak</div><div class="num" id="longestStreak">0</div></div>
+    <div class="stat"><div class="muted">Total days done</div><div class="num" id="totalDone">0</div></div>
+    <div class="stat"><div class="muted">Streak started</div><div class="num" id="streakStart">—</div></div>
+  </div>
+
+  <div class="calendar">
+    <div class="monthHead">
+      <div id="monthLabel" style="font-weight:700"></div>
+      <div class="muted" id="todayLabel"></div>
+    </div>
+
+    <div class="grid" id="weekdaysRow"></div>
+    <div class="grid" id="daysGrid"></div>
+
+    <div class="legend">
+      <div style="display:flex;gap:6px;align-items:center;"><div class="dot done"></div><div class="muted">Done</div></div>
+      <div style="display:flex;gap:6px;align-items:center;"><div class="dot missed"></div><div class="muted">Missed</div></div>
+      <div style="margin-left:auto" class="muted">Tap a day to toggle done</div>
+    </div>
+
+    <div class="actions">
+      <button id="exportBtn">Export data</button>
+      <button id="importBtn">Import data</button>
+      <button id="backupBtn">Auto-backup now</button>
+      <button id="resetBtn" class="dangerBtn">Clear all</button>
+      <input type="file" id="fileInput" accept=".json">
+    </div>
+
+    <div class="note">Tip: Only days up to today count for current streak. You can mark past days (if you forgot), but future days are ignored for streak calculation.</div>
+  </div>
+
+  <div class="footer">
+    Built for mobile — stores data locally and auto-saves a backup file. Want cloud sync? Add Firebase config (optional).
+  </div>
+</div>
+
+<script>
+/* ------------- CONFIG ------------- */
+/* If you want cloud sync with Firebase, create a Firebase project and paste the config below. 
+   If you don't want cloud sync, leave FIREBASE_ENABLED = false.
+*/
+const FIREBASE_ENABLED = false; // set to true only after you paste config & add firebase scripts below
+const FIREBASE_CONFIG = {
+  /* EXAMPLE:
+  apiKey: "YOUR_API_KEY",
+  authDomain: "PROJECT.firebaseapp.com",
+  projectId: "PROJECT",
+  storageBucket: "PROJECT.appspot.com",
+  messagingSenderId: "1234567890",
+  appId: "1:1234567890:web:abcdef"
+  */
+};
+
+/* ------------- storage keys ------------- */
+const STORAGE_KEY = 'streak-calendar-data-v2';
+const AUTO_BACKUP_FOLDER = 'StreakBackup'; // folder in Downloads
+
+/* ------------- helpers ------------- */
+function dateKey(y,m,d){ const mm = String(m).padStart(2,'0'); const dd = String(d).padStart(2,'0'); return `${y}-${mm}-${dd}`; }
+function fromKey(key){ const [y,m,d] = key.split('-').map(Number); return new Date(y,m-1,d); }
+function todayKey(){ const t = new Date(); return dateKey(t.getFullYear(), t.getMonth()+1, t.getDate()); }
+function saveLocal(data){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+function loadLocal(){ try{ const raw = localStorage.getItem(STORAGE_KEY); return raw? JSON.parse(raw): {marks:{}, habitName:"No addiction / junk food"} } catch(e){ return {marks:{}, habitName:"No addiction / junk food"} } }
+
+/* ------------- state & elements ------------- */
+let data = loadLocal();
+let viewYear, viewMonth;
+const weekdays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const daysGrid = document.getElementById('daysGrid');
+const weekdaysRow = document.getElementById('weekdaysRow');
+const monthLabel = document.getElementById('monthLabel');
+const todayLabel = document.getElementById('todayLabel');
+const currentStreakEl = document.getElementById('currentStreak');
+const longestStreakEl = document.getElementById('longestStreak');
+const totalDoneEl = document.getElementById('totalDone');
+const streakStartEl = document.getElementById('streakStart');
+const habitNameEl = document.getElementById('habitName');
+
+/* ------------- init ------------- */
+function init(){ const t = new Date(); viewYear = t.getFullYear(); viewMonth = t.getMonth(); renderWeekdays(); renderCalendar(); updateStats(); habitNameEl.textContent = data.habitName || "No addiction / junk food"; }
+init();
+
+/* ------------- render ------------- */
+function renderWeekdays(){ weekdaysRow.innerHTML=''; for(let i=0;i<7;i++){ const el=document.createElement('div'); el.className='weekday'; el.textContent=weekdays[i]; weekdaysRow.appendChild(el);} }
+function renderCalendar(){
+  daysGrid.innerHTML='';
+  const firstOfMonth = new Date(viewYear, viewMonth,1);
+  const startWeekday = firstOfMonth.getDay();
+  const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+  const prevMonthDays = startWeekday;
+  const prevMonthLast = new Date(viewYear, viewMonth, 0).getDate();
+  for(let i = prevMonthLast - prevMonthDays + 1; i <= prevMonthLast; i++){
+    const cell = makeDayCell(viewYear, viewMonth-1, i, true); cell.classList.add('other'); daysGrid.appendChild(cell);
+  }
+  for(let d=1; d<=daysInMonth; d++){ const cell = makeDayCell(viewYear, viewMonth, d, false); daysGrid.appendChild(cell); }
+  const totalCells = daysGrid.childElementCount;
+  const needed = (7 - (totalCells % 7)) % 7;
+  for(let i=1;i<=needed;i++){ const cell = makeDayCell(viewYear, viewMonth+1, i, true); cell.classList.add('other'); daysGrid.appendChild(cell); }
+  monthLabel.textContent = new Date(viewYear, viewMonth).toLocaleString(undefined,{month:'long', year:'numeric'});
+  const t = new Date(); todayLabel.textContent = `Today: ${t.toLocaleDateString()}`;
+}
+
+function makeDayCell(y, mZeroBased, day, dim){
+  const dateObj = new Date(y, mZeroBased, day);
+  const y2 = dateObj.getFullYear(), m2 = dateObj.getMonth()+1, d2 = dateObj.getDate();
+  const key = dateKey(y2, m2, d2);
+  const el = document.createElement('div');
+  el.className = 'day';
+  el.dataset.key = key;
+  el.dataset.isOther = dim ? '1':'0';
+  el.innerHTML = `<div>${d2}</div>`;
+  if(data.marks && data.marks[key]) el.classList.add('done');
+  const now = new Date();
+  if(y2===now.getFullYear() && m2===now.getMonth()+1 && d2===now.getDate()) el.classList.add('today');
+  const isPast = dateObj.setHours(0,0,0,0) < (new Date()).setHours(0,0,0,0);
+  if(isPast && (!data.marks || !data.marks[key])) el.classList.add('missed');
+  el.addEventListener('click', onDayClick);
+  return el;
+}
+
+/* ------------- click handler ------------- */
+function onDayClick(e){
+  const el = e.currentTarget;
+  const key = el.dataset.key;
+  const dt = fromKey(key);
+  const today = new Date(); today.setHours(0,0,0,0);
+  if(dt > today){ alert('Cannot mark future days for streak calculation. You can only mark up to today.'); return; }
+  data.marks = data.marks || {};
+  if(data.marks[key]) delete data.marks[key]; else data.marks[key] = true;
+  saveAll(); renderCalendar(); updateStats();
+}
+
+/* ------------- stats ------------- */
+function updateStats(){
+  const keys = Object.keys(data.marks || {}).sort();
+  totalDoneEl.textContent = keys.length;
+  function nextDayKey(k){ const dt = fromKey(k); const nd = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()+1); return dateKey(nd.getFullYear(), nd.getMonth()+1, nd.getDate()); }
+  let longest = 0, curLen = 0, prev = null;
+  for(const k of keys){ if(prev && nextDayKey(prev) === k) curLen++; else curLen = 1; if(curLen > longest) longest = curLen; prev = k; }
+  longestStreakEl.textContent = longest;
+  const today = new Date(); today.setHours(0,0,0,0);
+  let curStreak = 0, streakStart = null, d = new Date(today);
+  const set = new Set(keys);
+  while(true){
+    const k = dateKey(d.getFullYear(), d.getMonth()+1, d.getDate());
+    if(set.has(k)){ curStreak++; streakStart = new Date(d); d.setDate(d.getDate()-1); } else break;
+  }
+  currentStreakEl.textContent = curStreak;
+  streakStartEl.textContent = streakStart ? streakStart.toLocaleDateString() : '—';
+}
+
+/* ------------- month nav ------------- */
+document.getElementById('prev').addEventListener('click', ()=>{ viewMonth--; if(viewMonth<0){viewMonth=11;viewYear--;} renderCalendar(); });
+document.getElementById('next').addEventListener('click', ()=>{ viewMonth++; if(viewMonth>11){viewMonth=0;viewYear++;} renderCalendar(); });
+
+/* ------------- export/import/reset/backup ------------- */
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'streak-data.json'; a.click(); URL.revokeObjectURL(url);
+});
+
+document.getElementById('fileInput').addEventListener('change', (ev)=>{
+  const f = ev.target.files[0]; if(!f) return; const reader = new FileReader();
+  reader.onload = function(e){ try { const parsed = JSON.parse(e.target.result); if(parsed && parsed.marks){ data = parsed; saveLocal(data); renderCalendar(); updateStats(); alert('Import successful.'); } else alert('File did not look like valid streak data.'); } catch(err){ alert('Invalid JSON file.'); } };
+  reader.readAsText(f);
+});
+
+document.getElementById('importBtn').addEventListener('click', ()=>{ document.getElementById('fileInput').value=''; document.getElementById('fileInput').click(); });
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{ if(!confirm('Clear all stored data? This cannot be undone.')) return; data = {marks:{}, habitName:data.habitName||"No addiction / junk food"}; saveAll(); renderCalendar(); updateStats(); });
+
+document.getElementById('backupBtn').addEventListener('click', ()=>{ autoBackupToFile(true); });
+
+/* ------------- backup to phone storage ------------- */
+async function autoBackupToFile(showAlert=false){
+  try{
+    // Create a JSON file blob
+    const content = JSON.stringify(data, null, 2);
+    const filename = 'streak-backup-' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + '.json';
+    // Use the File System Access if available
+    if(window.showSaveFilePicker){
+      // modern browsers (rare on mobile) - try to save into Downloads
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{description:'JSON', accept:{'application/json':['.json']}}]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(content);
+      await writable.close();
+      if(showAlert) alert('Backup saved: ' + filename);
+      return;
+    }
+    // fallback - create blob and trigger download (saved to Downloads)
+    const blob = new Blob([content], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
+    if(showAlert) alert('Backup downloaded to Downloads: ' + filename);
+  }catch(err){
+    if(showAlert) alert('Backup failed: ' + err.message);
+  }
+}
+
+/* ------------- save all (local + auto-backup + optional firebase) ------------- */
+function saveAll(){
+  saveLocal(data);
+  // automatic lightweight backup to Downloads (non-blocking)
+  autoBackupToFile(false);
+  // Optional: send to Firebase (if enabled)
+  if(FIREBASE_ENABLED) firebaseSave(data);
+}
+
+/* ------------- habit name setting ------------- */
+document.getElementById('setHabit').addEventListener('click', ()=>{
+  const name = prompt('Give your habit a name (e.g., "No junk food"):', data.habitName||'No junk food');
+  if(name === null) return;
+  data.habitName = name.trim() || 'No addiction / junk food';
+  saveAll();
+  habitNameEl.textContent = data.habitName;
+});
+
+/* ------------- window unload ------------- */
+window.addEventListener('beforeunload', ()=> saveLocal(data));
+
+/* ------------- OPTIONAL: Firebase sync (disabled by default) -------------
+If you want cloud sync later:
+1) Create Firebase project at console.firebase.google.com
+2) Add a Web app and copy the config object into FIREBASE_CONFIG above
+3) Set FIREBASE_ENABLED = true
+4) Uncomment the <script> tags below (or add firebase SDK lines)
+This code uses anonymous auth + Firestore to save ``data`` under collection "streaks" document with ID = uid.
+*/
+async function firebaseInitAndListen(){
+  if(!FIREBASE_ENABLED) return;
+  if(!FIREBASE_CONFIG || !FIREBASE_CONFIG.apiKey){ console.warn('Firebase config missing'); return; }
+  // load firebase scripts dynamically
+  await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js');
+  await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js');
+  await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js');
+  const app = firebase.initializeApp(FIREBASE_CONFIG);
+  await firebase.auth().signInAnonymously();
+  const uid = firebase.auth().currentUser.uid;
+  const db = firebase.firestore();
+  // pull remote if exists
+  const docRef = db.collection('streaks').doc(uid);
+  const doc = await docRef.get();
+  if(doc.exists){
+    const remote = doc.data();
+    // Merge remote with local (remote takes precedence)
+    data = Object.assign({}, data, remote);
+    saveLocal(data);
+    renderCalendar();
+    updateStats();
+  } else {
+    // create remote with local data
+    await docRef.set(data);
+  }
+  // auto-sync on every save
+  window.firebaseSave = async function(payload){
+    try{ await db.collection('streaks').doc(uid).set(payload); }catch(e){ console.warn('Firebase save failed', e); }
+  };
+}
+
+function firebaseSave(payload){ console.warn('Firebase not enabled or initialized.'); }
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+
+/* ------------- register service worker ------------- */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('service-worker.js').then(()=>console.log('SW registered')).catch(e=>console.log('SW failed', e));
+}
+
+/* ------------- kick start firebase if enabled ------------- */
+if(FIREBASE_ENABLED) firebaseInitAndListen();
+</script>
+</body>
+</html>
